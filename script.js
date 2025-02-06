@@ -50,6 +50,9 @@ const placeInput = document.getElementById("place-name");
 const countryInput = document.getElementById("country-name");
 const addPlaceButton = document.getElementById("add-place");
 const placeList = document.getElementById("place-list");
+const timerContainer = document.getElementById("timer");
+const feedbackContainer = document.getElementById("feedback");
+const scoreContainer = document.getElementById("score");
 
 addPlaceButton.addEventListener("click", async function() {
     const placeName = placeInput.value.trim();
@@ -83,6 +86,23 @@ async function getCoordinates(place, country) {
     return null;
 }
 
+// Timer Function
+function resetTimer() {
+    clearInterval(timer);
+    timeLeft = 30;
+    timerContainer.innerText = `Time Left: ${timeLeft}s`;
+    timer = setInterval(() => {
+        timeLeft--;
+        timerContainer.innerText = `Time Left: ${timeLeft}s`;
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            feedbackContainer.innerText = "⏳ Time's up! Switching turns.";
+            switchPlayer();
+            showQuestion();
+        }
+    }, 1000);
+}
+
 // Multiplayer setup
 const players = {};
 let currentPlayer = "Player 1";
@@ -93,22 +113,42 @@ function switchPlayer() {
     resetTimer();
 }
 
-// Combined Questions List
-const quizQuestions = [
-    { question: "Click on the Amazon River", correctLocation: [-3.4653, -62.2159], region: "South America" },
-    { question: "Click on the capital of Japan", correctLocation: [35.682839, 139.759455], region: "Asia" },
-    { question: "Click on the Sahara Desert", correctLocation: [23.4162, 25.6628], region: "Africa" },
-    { question: "Click on Mount Everest", correctLocation: [27.9881, 86.9250], region: "Asia" },
-    { question: "Click on the Eiffel Tower", correctLocation: [48.8584, 2.2945], region: "Europe" }
-];
+// Handle map clicks
+map.on('click', function(event) {
+    checkAnswer(event.latlng.lat, event.latlng.lng);
+});
 
-let currentQuestionIndex = 0;
+// Function to Check Answers
+function checkAnswer(userLat, userLng) {
+    const allQuestions = [...quizQuestions, ...userDefinedQuestions];
+    const currentQuestion = allQuestions[currentQuestionIndex % allQuestions.length];
+    const correct = currentQuestion.correctLocation;
+    const distance = getDistance(userLat, userLng, correct[0], correct[1]);
+    
+    if (distance < 100) { // 100km tolerance
+        feedbackContainer.innerText = "✅ Correct! Moving to the next question.";
+        score += 10;
+        scoreContainer.innerText = `Score: ${score}`;
+        currentQuestionIndex++;
+        showQuestion();
+    } else {
+        feedbackContainer.innerText = "❌ Incorrect, try again!";
+    }
+}
 
-// Display Question
-const questionContainer = document.getElementById("question");
-const feedbackContainer = document.getElementById("feedback");
-const scoreContainer = document.getElementById("score");
+// Function to Calculate Distance Between Points
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+}
 
+// Show First Question
 function showQuestion() {
     const allQuestions = [...quizQuestions, ...userDefinedQuestions];
     if (allQuestions.length > 0) {
