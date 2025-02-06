@@ -9,27 +9,36 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
+
     <h1>Geography Quiz Game</h1>
 
-    <label for="region-select">Choose a Region:</label>
-    <select id="region-select">
-        <option value="World">World</option>
-        <option value="North America">North America</option>
-        <option value="South America">South America</option>
-        <option value="Europe">Europe</option>
-        <option value="Africa">Africa</option>
-        <option value="Asia">Asia</option>
-        <option value="Oceania">Oceania</option>
-    </select>
+    <div id="quiz-selection">
+        <button id="create-own-quiz">Create My Own Quiz</button>
+        <button id="auto-generate-quiz">Create a Quiz for Me</button>
+    </div>
 
-    <h2>Create Your Own Quiz</h2>
-    <label for="place-name">Enter a Place:</label>
-    <input type="text" id="place-name">
-    <button id="add-place">Add Place</button>
-    <button id="clear-quiz">Clear Quiz</button>
-    
-    <h3>Quiz Places:</h3>
-    <ul id="place-list"></ul>
+    <div id="manual-quiz-section" style="display:none;">
+        <h2>Enter Places for Your Quiz</h2>
+        <textarea id="place-list-input" rows="5" placeholder="Enter each place on a new line"></textarea>
+        <button id="add-places">Add Places</button>
+        <button id="start-game">Play Game</button>
+        <ul id="place-list"></ul>
+    </div>
+
+    <div id="auto-quiz-section" style="display:none;">
+        <h2>Select a Region</h2>
+        <label for="region-select">Choose a Region:</label>
+        <select id="region-select">
+            <option value="World">World</option>
+            <option value="North America">North America</option>
+            <option value="South America">South America</option>
+            <option value="Europe">Europe</option>
+            <option value="Africa">Africa</option>
+            <option value="Asia">Asia</option>
+            <option value="Oceania">Oceania</option>
+        </select>
+        <button id="start-game">Play Game</button>
+    </div>
 
     <h2>Quiz</h2>
     <p id="question">No questions available.</p>
@@ -40,5 +49,6 @@
     <div id="map" style="height: 500px;"></div>
 
     <script src="script.js"></script>
+
 </body>
 </html>
