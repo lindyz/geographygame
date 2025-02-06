@@ -3,7 +3,8 @@
 // HTML Structure:
 // - A div for the map
 // - A dropdown for region selection
-// - A text area for custom topics (countries, rivers, lakes, etc.)
+// - A textarea for entering multiple places at once
+// - A button to start the game after all places are added
 // - A div for questions, feedback, score, multiplayer status, and timer
 
 // Include Leaflet.js in your HTML file:
@@ -35,19 +36,13 @@ let totalQuestions = 0;
 let timeLeft = 30;
 let timer;
 let currentQuestionIndex = 0;
+let currentLayer = null;
 
-// Handle region selection
+// UI Elements
 const regionSelect = document.getElementById("region-select");
-regionSelect.addEventListener("change", function() {
-    const selectedRegion = regionSelect.value;
-    if (regions[selectedRegion]) {
-        map.fitBounds(regions[selectedRegion]);
-    }
-});
-
-// Display user-created quiz list
-const placeInput = document.getElementById("place-name");
-const addPlaceButton = document.getElementById("add-place");
+const placeInput = document.getElementById("place-list-input");
+const addPlacesButton = document.getElementById("add-places");
+const startGameButton = document.getElementById("start-game");
 const placeList = document.getElementById("place-list");
 const timerContainer = document.getElementById("timer");
 const feedbackContainer = document.getElementById("feedback");
@@ -55,61 +50,56 @@ const scoreContainer = document.getElementById("score");
 const questionContainer = document.getElementById("question");
 const clearQuizButton = document.getElementById("clear-quiz");
 
-addPlaceButton.addEventListener("click", async function() {
-    const placeName = placeInput.value.trim();
-    if (placeName) {
-        const coordinates = await getCoordinates(placeName);
-        if (coordinates) {
-            const listItem = document.createElement("li");
-            listItem.innerText = placeName;
-            listItem.dataset.index = userDefinedQuestions.length;
-            listItem.addEventListener("click", function() {
-                userDefinedQuestions.splice(listItem.dataset.index, 1);
-                placeList.removeChild(listItem);
-            });
-            placeList.appendChild(listItem);
-            userDefinedQuestions.push({
-                question: `Click on ${placeName}`,
-                correctLocation: coordinates,
-                listElement: listItem
-            });
-            placeInput.value = "";
-            showQuestion();
-        } else {
-            alert("Could not find location. Please check spelling or try another place.");
+// Function to process multiple place inputs and fetch boundaries before the game starts
+addPlacesButton.addEventListener("click", async function() {
+    const placeNames = placeInput.value.trim().split("\n").map(name => name.trim()).filter(name => name);
+    if (placeNames.length > 0) {
+        for (let placeName of placeNames) {
+            const geoData = await getBoundary(placeName);
+            if (geoData) {
+                const listItem = document.createElement("li");
+                listItem.innerText = placeName;
+                placeList.appendChild(listItem);
+                userDefinedQuestions.push({
+                    question: `Click on ${placeName}`,
+                    boundary: geoData,
+                    listElement: listItem
+                });
+            } else {
+                alert(`Could not find location for: ${placeName}. Please provide more details.`);
+            }
         }
+        placeInput.value = "";
     }
 });
 
+// Start the game after all places are entered
+startGameButton.addEventListener("click", function() {
+    if (userDefinedQuestions.length > 0) {
+        currentQuestionIndex = 0;
+        showQuestion();
+    } else {
+        alert("Please add places before starting the game.");
+    }
+});
+
+// Function to clear the quiz
 clearQuizButton.addEventListener("click", function() {
     userDefinedQuestions = [];
     placeList.innerHTML = "";
-    showQuestion();
+    questionContainer.innerText = "No questions available.";
+    if (currentLayer) {
+        map.removeLayer(currentLayer);
+    }
 });
 
-async function getCoordinates(place) {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${place}`);
+async function getBoundary(place) {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}`);
     const data = await response.json();
-    if (data.length > 0) {
-        return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    if (data.features.length > 0) {
+        return data.features[0];
     }
     return null;
-}
-
-// Timer Function
-function resetTimer() {
-    clearInterval(timer);
-    timeLeft = 30;
-    timerContainer.innerText = `Time Left: ${timeLeft}s`;
-    timer = setInterval(() => {
-        timeLeft--;
-        timerContainer.innerText = `Time Left: ${timeLeft}s`;
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            feedbackContainer.innerText = "⏳ Time's up!";
-            showQuestion();
-        }
-    }, 1000);
 }
 
 // Handle map clicks
@@ -117,46 +107,32 @@ map.on('click', function(event) {
     checkAnswer(event.latlng.lat, event.latlng.lng);
 });
 
-// Function to Check Answers and Highlight Selections
+// Function to Check Answers and Highlight Boundaries
 function checkAnswer(userLat, userLng) {
     if (userDefinedQuestions.length === 0) return;
     const currentQuestion = userDefinedQuestions[currentQuestionIndex % userDefinedQuestions.length];
-    const correct = currentQuestion.correctLocation;
-    const distance = getDistance(userLat, userLng, correct[0], correct[1]);
     
-    let clickedMarker = L.circleMarker([userLat, userLng], { color: 'red' }).addTo(map);
-    let correctMarker = L.circleMarker(correct, { color: 'green' }).addTo(map);
-
-    if (distance < 100) {
-        feedbackContainer.innerText = "✅ Correct!";
-        score += 10;
-        scoreContainer.innerText = `Score: ${score}`;
-        currentQuestion.listElement.style.color = "green";
-        currentQuestionIndex++;
-        showQuestion();
-    } else {
-        feedbackContainer.innerText = `❌ Incorrect! You clicked on ${userLat.toFixed(2)}, ${userLng.toFixed(2)}`;
+    if (currentLayer) {
+        map.removeLayer(currentLayer);
     }
-}
-
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    
+    currentLayer = L.geoJSON(currentQuestion.boundary, {
+        style: { color: 'green', weight: 3 }
+    }).addTo(map);
+    
+    feedbackContainer.innerText = "✅ Correct!";
+    score += 10;
+    scoreContainer.innerText = `Score: ${score}`;
+    currentQuestion.listElement.style.color = "green";
+    currentQuestionIndex++;
+    showQuestion();
 }
 
 // Show First Question
 function showQuestion() {
-    if (userDefinedQuestions.length > 0) {
-        questionContainer.innerText = userDefinedQuestions[currentQuestionIndex % userDefinedQuestions.length].question;
-        resetTimer();
+    if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
+        questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
     } else {
-        questionContainer.innerText = "No questions available.";
+        questionContainer.innerText = "Quiz complete!";
     }
 }
-showQuestion();
