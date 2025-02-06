@@ -45,6 +45,9 @@ regionSelect.addEventListener("change", function() {
     }
 });
 
+// Display user-created quiz list
+const quizListContainer = document.getElementById("quiz-list");
+
 // Handle user-defined question entry
 const placeInput = document.getElementById("place-name");
 const countryInput = document.getElementById("country-name");
@@ -53,6 +56,7 @@ const placeList = document.getElementById("place-list");
 const timerContainer = document.getElementById("timer");
 const feedbackContainer = document.getElementById("feedback");
 const scoreContainer = document.getElementById("score");
+const questionContainer = document.getElementById("question");
 
 addPlaceButton.addEventListener("click", async function() {
     const placeName = placeInput.value.trim();
@@ -64,11 +68,16 @@ addPlaceButton.addEventListener("click", async function() {
             userDefinedQuestions.push({
                 question: `Click on ${placeName}, ${countryName}`,
                 correctLocation: coordinates,
-                region: "User Defined"
+                region: "User Defined",
+                listElement: null
             });
+            
             const listItem = document.createElement("li");
             listItem.innerText = `${placeName}, ${countryName}`;
             placeList.appendChild(listItem);
+            
+            userDefinedQuestions[userDefinedQuestions.length - 1].listElement = listItem;
+            
             placeInput.value = "";
             countryInput.value = "";
         } else {
@@ -103,59 +112,33 @@ function resetTimer() {
     }, 1000);
 }
 
-// Multiplayer setup
-const players = {};
-let currentPlayer = "Player 1";
-
-function switchPlayer() {
-    currentPlayer = currentPlayer === "Player 1" ? "Player 2" : "Player 1";
-    document.getElementById("player-status").innerText = `Current Turn: ${currentPlayer}`;
-    resetTimer();
-}
-
 // Handle map clicks
 map.on('click', function(event) {
     checkAnswer(event.latlng.lat, event.latlng.lng);
 });
 
-// Function to Check Answers
+// Function to Check Answers and Highlight Selections
 function checkAnswer(userLat, userLng) {
     const allQuestions = [...quizQuestions, ...userDefinedQuestions];
     const currentQuestion = allQuestions[currentQuestionIndex % allQuestions.length];
     const correct = currentQuestion.correctLocation;
     const distance = getDistance(userLat, userLng, correct[0], correct[1]);
     
-    if (distance < 100) { // 100km tolerance
+    let clickedMarker = L.circleMarker([userLat, userLng], { color: 'red' }).addTo(map);
+    let correctMarker = L.circleMarker(correct, { color: 'green' }).addTo(map);
+
+    if (distance < 100) {
         feedbackContainer.innerText = "✅ Correct! Moving to the next question.";
         score += 10;
         scoreContainer.innerText = `Score: ${score}`;
         currentQuestionIndex++;
+        
+        if (currentQuestion.listElement) {
+            currentQuestion.listElement.style.color = "green";
+        }
+        
         showQuestion();
     } else {
-        feedbackContainer.innerText = "❌ Incorrect, try again!";
+        feedbackContainer.innerText = `❌ Incorrect! You clicked on ${userLat.toFixed(2)}, ${userLng.toFixed(2)}`;
     }
 }
-
-// Function to Calculate Distance Between Points
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-}
-
-// Show First Question
-function showQuestion() {
-    const allQuestions = [...quizQuestions, ...userDefinedQuestions];
-    if (allQuestions.length > 0) {
-        questionContainer.innerText = allQuestions[currentQuestionIndex % allQuestions.length].question;
-        resetTimer();
-    } else {
-        questionContainer.innerText = "No questions available.";
-    }
-}
-showQuestion();
