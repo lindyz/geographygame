@@ -9,6 +9,13 @@ window.onload = function () {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    // Load country borders for better visibility when zoomed in
+    fetch("https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson")
+        .then(response => response.json())
+        .then(data => {
+            L.geoJSON(data, { style: { color: '#000', weight: 1 } }).addTo(map);
+        });
+
     // Regions and corresponding bounds
     const regions = {
         'World': [[-90, -180], [90, 180]],
@@ -42,61 +49,20 @@ window.onload = function () {
     const questionContainer = document.getElementById("question");
     const clearQuizButton = document.getElementById("clear-quiz");
 
-    // Check if elements exist before adding event listeners
-    if (createOwnQuizButton && autoGenerateQuizButton) {
-        createOwnQuizButton.addEventListener("click", function() {
-            document.getElementById("manual-quiz-section").style.display = "block";
-            document.getElementById("auto-quiz-section").style.display = "none";
-        });
-
-        autoGenerateQuizButton.addEventListener("click", function() {
-            document.getElementById("manual-quiz-section").style.display = "none";
-            document.getElementById("auto-quiz-section").style.display = "block";
-        });
-    }
-
-    if (addPlacesButton && placeInput) {
-        addPlacesButton.addEventListener("click", async function() {
-            const placeNames = placeInput.value.trim().split("\n").map(name => name.trim()).filter(name => name);
-            if (placeNames.length > 0) {
-                for (let placeName of placeNames) {
-                    const geoData = await getBoundary(placeName);
-                    if (geoData) {
-                        const listItem = document.createElement("li");
-                        listItem.innerText = placeName;
-                        placeList.appendChild(listItem);
-                        userDefinedQuestions.push({
-                            question: `Click on ${placeName}`,
-                            boundary: geoData,
-                            listElement: listItem
-                        });
-                    } else {
-                        alert(`Could not find location for: ${placeName}. Please provide more details.`);
-                    }
-                }
-                placeInput.value = "";
-            }
-        });
-    }
-
-    if (startGameButton) {
-        startGameButton.addEventListener("click", function() {
-            if (userDefinedQuestions.length > 0) {
-                currentQuestionIndex = 0;
-                showQuestion();
+    if (autoGenerateQuizButton) {
+        autoGenerateQuizButton.addEventListener("click", async function () {
+            const selectedRegion = regionSelect.value;
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&bounded=1&q=${selectedRegion}`);
+            const data = await response.json();
+            if (data.features.length > 0) {
+                userDefinedQuestions = data.features.map(feature => ({
+                    question: `Click on ${feature.properties.display_name}`,
+                    boundary: feature,
+                    listElement: null
+                }));
+                startGameButton.click();
             } else {
-                alert("Please add places before starting the game.");
-            }
-        });
-    }
-
-    if (clearQuizButton) {
-        clearQuizButton.addEventListener("click", function() {
-            userDefinedQuestions = [];
-            placeList.innerHTML = "";
-            questionContainer.innerText = "No questions available.";
-            if (currentLayer) {
-                map.removeLayer(currentLayer);
+                alert("Could not generate quiz for this region.");
             }
         });
     }
@@ -112,18 +78,17 @@ window.onload = function () {
 
     // Handle map clicks
     map.on('click', function(event) {
-        checkAnswer(event.latlng.lat, event.latlng.lng);
+        checkAnswer(event.latlng);
     });
 
-    // Function to Check Answers and Highlight Boundaries
-    function checkAnswer(userLat, userLng) {
+    function checkAnswer(clickedLatLng) {
         if (userDefinedQuestions.length === 0 || currentQuestionIndex >= userDefinedQuestions.length) return;
         const currentQuestion = userDefinedQuestions[currentQuestionIndex];
-
+        
         if (currentLayer) {
             map.removeLayer(currentLayer);
         }
-
+        
         currentLayer = L.geoJSON(currentQuestion.boundary, {
             style: { color: 'green', weight: 3 }
         }).addTo(map);
@@ -131,12 +96,13 @@ window.onload = function () {
         feedbackContainer.innerText = "✅ Correct!";
         score += 10;
         scoreContainer.innerText = `Score: ${score}`;
-        currentQuestion.listElement.style.color = "green";
+        if (currentQuestion.listElement) {
+            currentQuestion.listElement.style.color = "green";
+        }
         currentQuestionIndex++;
         showQuestion();
     }
 
-    // Show First Question
     function showQuestion() {
         if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
             questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
