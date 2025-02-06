@@ -29,12 +29,12 @@ const regions = {
 };
 
 // Custom user-defined topics
-let customTopics = [];
 let userDefinedQuestions = [];
 let score = 0;
 let totalQuestions = 0;
 let timeLeft = 30;
 let timer;
+let currentQuestionIndex = 0;
 
 // Handle region selection
 const regionSelect = document.getElementById("region-select");
@@ -46,48 +46,49 @@ regionSelect.addEventListener("change", function() {
 });
 
 // Display user-created quiz list
-const quizListContainer = document.getElementById("quiz-list");
-
-// Handle user-defined question entry
 const placeInput = document.getElementById("place-name");
-const countryInput = document.getElementById("country-name");
 const addPlaceButton = document.getElementById("add-place");
 const placeList = document.getElementById("place-list");
 const timerContainer = document.getElementById("timer");
 const feedbackContainer = document.getElementById("feedback");
 const scoreContainer = document.getElementById("score");
 const questionContainer = document.getElementById("question");
+const clearQuizButton = document.getElementById("clear-quiz");
 
 addPlaceButton.addEventListener("click", async function() {
     const placeName = placeInput.value.trim();
-    const countryName = countryInput.value.trim();
-    
-    if (placeName && countryName) {
-        const coordinates = await getCoordinates(placeName, countryName);
+    if (placeName) {
+        const coordinates = await getCoordinates(placeName);
         if (coordinates) {
-            userDefinedQuestions.push({
-                question: `Click on ${placeName}, ${countryName}`,
-                correctLocation: coordinates,
-                region: "User Defined",
-                listElement: null
-            });
-            
             const listItem = document.createElement("li");
-            listItem.innerText = `${placeName}, ${countryName}`;
+            listItem.innerText = placeName;
+            listItem.dataset.index = userDefinedQuestions.length;
+            listItem.addEventListener("click", function() {
+                userDefinedQuestions.splice(listItem.dataset.index, 1);
+                placeList.removeChild(listItem);
+            });
             placeList.appendChild(listItem);
-            
-            userDefinedQuestions[userDefinedQuestions.length - 1].listElement = listItem;
-            
+            userDefinedQuestions.push({
+                question: `Click on ${placeName}`,
+                correctLocation: coordinates,
+                listElement: listItem
+            });
             placeInput.value = "";
-            countryInput.value = "";
+            showQuestion();
         } else {
             alert("Could not find location. Please check spelling or try another place.");
         }
     }
 });
 
-async function getCoordinates(place, country) {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${place},${country}`);
+clearQuizButton.addEventListener("click", function() {
+    userDefinedQuestions = [];
+    placeList.innerHTML = "";
+    showQuestion();
+});
+
+async function getCoordinates(place) {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${place}`);
     const data = await response.json();
     if (data.length > 0) {
         return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -105,8 +106,7 @@ function resetTimer() {
         timerContainer.innerText = `Time Left: ${timeLeft}s`;
         if (timeLeft <= 0) {
             clearInterval(timer);
-            feedbackContainer.innerText = "⏳ Time's up! Switching turns.";
-            switchPlayer();
+            feedbackContainer.innerText = "⏳ Time's up!";
             showQuestion();
         }
     }, 1000);
@@ -119,8 +119,8 @@ map.on('click', function(event) {
 
 // Function to Check Answers and Highlight Selections
 function checkAnswer(userLat, userLng) {
-    const allQuestions = [...quizQuestions, ...userDefinedQuestions];
-    const currentQuestion = allQuestions[currentQuestionIndex % allQuestions.length];
+    if (userDefinedQuestions.length === 0) return;
+    const currentQuestion = userDefinedQuestions[currentQuestionIndex % userDefinedQuestions.length];
     const correct = currentQuestion.correctLocation;
     const distance = getDistance(userLat, userLng, correct[0], correct[1]);
     
@@ -128,17 +128,35 @@ function checkAnswer(userLat, userLng) {
     let correctMarker = L.circleMarker(correct, { color: 'green' }).addTo(map);
 
     if (distance < 100) {
-        feedbackContainer.innerText = "✅ Correct! Moving to the next question.";
+        feedbackContainer.innerText = "✅ Correct!";
         score += 10;
         scoreContainer.innerText = `Score: ${score}`;
+        currentQuestion.listElement.style.color = "green";
         currentQuestionIndex++;
-        
-        if (currentQuestion.listElement) {
-            currentQuestion.listElement.style.color = "green";
-        }
-        
         showQuestion();
     } else {
         feedbackContainer.innerText = `❌ Incorrect! You clicked on ${userLat.toFixed(2)}, ${userLng.toFixed(2)}`;
     }
 }
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Show First Question
+function showQuestion() {
+    if (userDefinedQuestions.length > 0) {
+        questionContainer.innerText = userDefinedQuestions[currentQuestionIndex % userDefinedQuestions.length].question;
+        resetTimer();
+    } else {
+        questionContainer.innerText = "No questions available.";
+    }
+}
+showQuestion();
