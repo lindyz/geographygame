@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geography Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+    <h1>Geography Quiz Game</h1>
+    
+    <label for="region-select">Choose a Region:</label>
+    <select id="region-select">
+        <option value="World">World</option>
+        <option value="North America">North America</option>
+        <option value="South America">South America</option>
+        <option value="Europe">Europe</option>
+        <option value="Africa">Africa</option>
+        <option value="Asia">Asia</option>
+        <option value="Oceania">Oceania</option>
+        <option value="User Defined">User Defined</option>
+    </select>
+
+    <h2>Add Your Own Locations</h2>
+    <label for="place-name">Place Name:</label>
+    <input type="text" id="place-name">
+    
+    <label for="country-name">Country:</label>
+    <input type="text" id="country-name">
+    
+    <button id="add-place">Add to Quiz</button>
+    
+    <ul id="place-list"></ul>
+
+    <h2>Quiz Area</h2>
+    <p id="question">Loading question...</p>
+    <div id="feedback"></div>
+    <div id="score">Score: 0</div>
+    <div id="player-status">Current Turn: Player 1</div>
+    <div id="timer">Time Left: 30s</div>
+
+    <div id="map"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

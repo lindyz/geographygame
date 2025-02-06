@@ -1,0 +1,41 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    color: #333;
+}
+
+#map {
+    width: 80%;
+    height: 500px;
+    margin: 20px auto;
+    border: 2px solid black;
+}
+
+#question, #feedback, #score, #player-status, #timer {
+    font-size: 18px;
+    margin: 10px;
+}
+
+#region-select, #place-name, #country-name, #add-place {
+    margin: 5px;
+    padding: 10px;
+    font-size: 16px;
+}
+
+button {
+    background-color: #008CBA;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #005f75;
+}
