@@ -101,6 +101,30 @@ window.onload = function () {
         deleteQuizButton.addEventListener("click", deleteQuiz);
     }
 
+    if (startGameButton) {
+        startGameButton.addEventListener("click", function () {
+            if (userDefinedQuestions.length > 0) {
+                currentQuestionIndex = 0;
+                score = 0;
+                scoreContainer.innerText = `Score: ${score}`;
+                timeLeft = 30;
+                timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                timer = setInterval(() => {
+                    timeLeft--;
+                    timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        alert("Time's up!");
+                        deleteQuiz();
+                    }
+                }, 1000);
+                showQuestion();
+            } else {
+                alert("Please add places before starting the game.");
+            }
+        });
+    }
+
     map.on('click', function(event) {
         checkAnswer(event.latlng);
     });
