@@ -12,13 +12,14 @@
 
     <h1>Geography Quiz Game</h1>
 
-    <div id="quiz-selection">
-        <button id="create-own-quiz">Create My Own Quiz</button>
-        <button id="auto-generate-quiz">Create a Quiz for Me</button>
-    </div>
+    <h2>Name Your Quiz</h2>
+    <input type="text" id="quiz-name" placeholder="Enter quiz name">
+    <button id="save-quiz">Save Quiz</button>
 
-    <!-- Manual Quiz Section -->
-    <div id="manual-quiz-section" style="display:none;">
+    <h2>Saved Quizzes</h2>
+    <div id="saved-quizzes"></div>
+
+    <div id="manual-quiz-section">
         <h2>Enter Places for Your Quiz</h2>
         <textarea id="place-list-input" rows="5" placeholder="Enter each place on a new line"></textarea>
         <button id="add-places">Add Places</button>
@@ -26,10 +27,14 @@
         <ul id="place-list"></ul>
     </div>
 
-    <!-- Auto-Generated Quiz Section -->
-    <div id="auto-quiz-section" style="display:none;">
-        <h2>Select a Region</h2>
-        <label for="region-select">Choose a Region:</label>
-        <select id="region-select">
-            <option value="World">World</option>
-            <option value="North Americ
+    <h2>Quiz</h2>
+    <p id="question">No questions available.</p>
+    <div id="feedback"></div>
+    <div id="score">Score: 0</div>
+
+    <div id="map" style="height: 500px;"></div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
