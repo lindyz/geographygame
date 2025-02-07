@@ -9,13 +9,6 @@ window.onload = function () {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Load country borders for better visibility when zoomed in
-    fetch("https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson")
-        .then(response => response.json())
-        .then(data => {
-            L.geoJSON(data, { style: { color: '#000', weight: 1 } }).addTo(map);
-        });
-
     // User-defined questions
     let savedQuizzes = JSON.parse(localStorage.getItem("savedQuizzes")) || {};
     let userDefinedQuestions = [];
@@ -60,17 +53,6 @@ window.onload = function () {
         alert("Quiz saved successfully!");
     }
 
-    function loadQuiz(quizName) {
-        userDefinedQuestions = savedQuizzes[quizName] || [];
-        showQuestion();
-    }
-
-    function deleteQuiz(quizName) {
-        delete savedQuizzes[quizName];
-        localStorage.setItem("savedQuizzes", JSON.stringify(savedQuizzes));
-        updateSavedQuizList();
-    }
-
     function resetGame() {
         userDefinedQuestions = [];
         placeList.innerHTML = "";
@@ -84,6 +66,16 @@ window.onload = function () {
         }
     }
 
+    async function getBoundary(place) {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}&polygon_geojson=1`);
+        const data = await response.json();
+        if (data.features.length > 0) {
+            return data.features[0];
+        }
+        return null;
+    }
+
+    // Add places manually
     if (addPlacesButton) {
         addPlacesButton.addEventListener("click", async function () {
             const placeNames = placeInput.value.trim().split("\n").map(name => name.trim()).filter(name => name);
@@ -96,7 +88,7 @@ window.onload = function () {
                         placeList.appendChild(listItem);
                         userDefinedQuestions.push({
                             question: `Click on ${placeName}`,
-                            boundary: geoData,
+                            boundary: geoData.geometry,
                             listElement: listItem
                         });
                     } else {
@@ -108,6 +100,7 @@ window.onload = function () {
         });
     }
 
+    // Start the game
     if (startGameButton) {
         startGameButton.addEventListener("click", function () {
             if (userDefinedQuestions.length > 0) {
@@ -130,21 +123,75 @@ window.onload = function () {
         });
     }
 
+    // Click event listener for the map
+    map.on('click', function(event) {
+        checkAnswer(event.latlng);
+    });
+
+    function checkAnswer(clickedLatLng) {
+        if (userDefinedQuestions.length === 0 || currentQuestionIndex >= userDefinedQuestions.length) return;
+        const currentQuestion = userDefinedQuestions[currentQuestionIndex];
+
+        if (currentLayer) {
+            map.removeLayer(currentLayer);
+        }
+
+        // Check if the clicked point is inside the correct region
+        let correct = false;
+        if (currentQuestion.boundary.type === "Polygon") {
+            correct = insidePolygon([clickedLatLng.lng, clickedLatLng.lat], currentQuestion.boundary.coordinates);
+        } else if (currentQuestion.boundary.type === "MultiPolygon") {
+            for (let polygon of currentQuestion.boundary.coordinates) {
+                if (insidePolygon([clickedLatLng.lng, clickedLatLng.lat], polygon)) {
+                    correct = true;
+                    break;
+                }
+            }
+        }
+
+        if (correct) {
+            feedbackContainer.innerText = "✅ Correct!";
+            score += 10;
+            scoreContainer.innerText = `Score: ${score}`;
+            currentLayer = L.geoJSON(currentQuestion.boundary, { style: { color: 'green', weight: 3 } }).addTo(map);
+            if (currentQuestion.listElement) {
+                currentQuestion.listElement.style.color = "green";
+            }
+            currentQuestionIndex++;
+            showQuestion();
+        } else {
+            feedbackContainer.innerText = "❌ Incorrect! Try again.";
+        }
+    }
+
+    function insidePolygon(point, polygon) {
+        let x = point[0], y = point[1];
+        let inside = false;
+        for (let i = 0, j = polygon[0].length - 1; i < polygon[0].length; j = i++) {
+            let xi = polygon[0][i][0], yi = polygon[0][i][1];
+            let xj = polygon[0][j][0], yj = polygon[0][j][1];
+
+            let intersect = ((yi > y) !== (yj > y)) &&
+                (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function showQuestion() {
+        if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
+            questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
+        } else {
+            questionContainer.innerText = "Quiz complete!";
+        }
+    }
+
     if (saveQuizButton) {
         saveQuizButton.addEventListener("click", saveQuiz);
     }
 
     if (clearQuizButton) {
         clearQuizButton.addEventListener("click", resetGame);
-    }
-
-    async function getBoundary(place) {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}&polygon_geojson=1`);
-        const data = await response.json();
-        if (data.features.length > 0) {
-            return data.features[0].geometry;
-        }
-        return null;
     }
 
     updateSavedQuizList();
