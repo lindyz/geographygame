@@ -1,9 +1,9 @@
-// Map-Based Geography Quiz Game using Leaflet.js with User-Defined Questions, Scoring, and Boundary Highlighting
+// Map-Based Geography Quiz Game using Leaflet.js with User-Defined Questions, Scoring, Timer, and Boundary Highlighting
 
 // Ensure script runs only after the DOM is fully loaded
 window.onload = function () {
     // Initialize the map
-    const map = L.map('map').setView([20, 0], 2); // Centered globally
+    const map = L.map('map').setView([20, 0], 2);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -22,6 +22,8 @@ window.onload = function () {
     let score = 0;
     let currentQuestionIndex = 0;
     let currentLayer = null;
+    let timer;
+    let timeLeft = 30;
 
     // UI Elements
     const quizNameInput = document.getElementById("quiz-name");
@@ -33,19 +35,16 @@ window.onload = function () {
     const placeList = document.getElementById("place-list");
     const feedbackContainer = document.getElementById("feedback");
     const scoreContainer = document.getElementById("score");
+    const timerContainer = document.getElementById("timer");
     const questionContainer = document.getElementById("question");
     const clearQuizButton = document.getElementById("clear-quiz");
-    const manualQuizSection = document.getElementById("manual-quiz-section");
 
     function updateSavedQuizList() {
         loadQuizList.innerHTML = "";
         for (const quizName in savedQuizzes) {
-            const quizLink = document.createElement("button");
-            quizLink.innerText = quizName;
-            quizLink.addEventListener("click", function () {
-                loadQuiz(quizName);
-            });
-            loadQuizList.appendChild(quizLink);
+            const quizEntry = document.createElement("div");
+            quizEntry.innerHTML = `<button class='quiz-btn'>${quizName}</button> <button class='delete-btn' data-quiz='${quizName}'>❌</button>`;
+            loadQuizList.appendChild(quizEntry);
         }
     }
 
@@ -64,6 +63,25 @@ window.onload = function () {
     function loadQuiz(quizName) {
         userDefinedQuestions = savedQuizzes[quizName] || [];
         showQuestion();
+    }
+
+    function deleteQuiz(quizName) {
+        delete savedQuizzes[quizName];
+        localStorage.setItem("savedQuizzes", JSON.stringify(savedQuizzes));
+        updateSavedQuizList();
+    }
+
+    function resetGame() {
+        userDefinedQuestions = [];
+        placeList.innerHTML = "";
+        questionContainer.innerText = "No questions available.";
+        score = 0;
+        scoreContainer.innerText = `Score: ${score}`;
+        clearInterval(timer);
+        timerContainer.innerText = "Time Left: 30s";
+        if (currentLayer) {
+            map.removeLayer(currentLayer);
+        }
     }
 
     if (addPlacesButton) {
@@ -94,6 +112,17 @@ window.onload = function () {
         startGameButton.addEventListener("click", function () {
             if (userDefinedQuestions.length > 0) {
                 currentQuestionIndex = 0;
+                timeLeft = 30;
+                timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                timer = setInterval(() => {
+                    timeLeft--;
+                    timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        alert("Time's up!");
+                        resetGame();
+                    }
+                }, 1000);
                 showQuestion();
             } else {
                 alert("Please add places before starting the game.");
@@ -105,6 +134,10 @@ window.onload = function () {
         saveQuizButton.addEventListener("click", saveQuiz);
     }
 
+    if (clearQuizButton) {
+        clearQuizButton.addEventListener("click", resetGame);
+    }
+
     async function getBoundary(place) {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}&polygon_geojson=1`);
         const data = await response.json();
@@ -112,46 +145,6 @@ window.onload = function () {
             return data.features[0].geometry;
         }
         return null;
-    }
-
-    map.on('click', function(event) {
-        checkAnswer(event.latlng);
-    });
-
-    function checkAnswer(clickedLatLng) {
-        if (userDefinedQuestions.length === 0 || currentQuestionIndex >= userDefinedQuestions.length) return;
-        const currentQuestion = userDefinedQuestions[currentQuestionIndex];
-
-        if (currentLayer) {
-            map.removeLayer(currentLayer);
-        }
-
-        const correct = turf.booleanPointInPolygon(
-            turf.point([clickedLatLng.lng, clickedLatLng.lat]),
-            turf.polygon(currentQuestion.boundary.coordinates)
-        );
-
-        if (correct) {
-            feedbackContainer.innerText = "✅ Correct!";
-            score += 10;
-            scoreContainer.innerText = `Score: ${score}`;
-            currentLayer = L.geoJSON(currentQuestion.boundary, { style: { color: 'green', weight: 3 } }).addTo(map);
-            if (currentQuestion.listElement) {
-                currentQuestion.listElement.style.color = "green";
-            }
-            currentQuestionIndex++;
-            showQuestion();
-        } else {
-            feedbackContainer.innerText = "❌ Incorrect! Try again.";
-        }
-    }
-
-    function showQuestion() {
-        if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
-            questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
-        } else {
-            questionContainer.innerText = "Quiz complete!";
-        }
     }
 
     updateSavedQuizList();
