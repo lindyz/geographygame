@@ -48,19 +48,32 @@ window.onload = function () {
     const scoreContainer = document.getElementById("score");
     const questionContainer = document.getElementById("question");
     const clearQuizButton = document.getElementById("clear-quiz");
+    const manualQuizSection = document.getElementById("manual-quiz-section");
+    const autoQuizSection = document.getElementById("auto-quiz-section");
+
+    if (createOwnQuizButton) {
+        createOwnQuizButton.addEventListener("click", function () {
+            manualQuizSection.style.display = "block";
+            autoQuizSection.style.display = "none";
+        });
+    }
 
     if (autoGenerateQuizButton) {
         autoGenerateQuizButton.addEventListener("click", async function () {
+            manualQuizSection.style.display = "none";
+            autoQuizSection.style.display = "block";
+            
             const selectedRegion = regionSelect.value;
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&bounded=1&q=${selectedRegion}`);
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${selectedRegion}&polygon_geojson=1&limit=5`);
             const data = await response.json();
+            
             if (data.features.length > 0) {
                 userDefinedQuestions = data.features.map(feature => ({
                     question: `Click on ${feature.properties.display_name}`,
-                    boundary: feature,
+                    boundary: feature.geometry,
                     listElement: null
                 }));
-                startGameButton.click();
+                startGame();
             } else {
                 alert("Could not generate quiz for this region.");
             }
@@ -68,10 +81,10 @@ window.onload = function () {
     }
 
     async function getBoundary(place) {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}`);
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}&polygon_geojson=1`);
         const data = await response.json();
         if (data.features.length > 0) {
-            return data.features[0];
+            return data.features[0].geometry;
         }
         return null;
     }
@@ -100,6 +113,11 @@ window.onload = function () {
             currentQuestion.listElement.style.color = "green";
         }
         currentQuestionIndex++;
+        showQuestion();
+    }
+
+    function startGame() {
+        currentQuestionIndex = 0;
         showQuestion();
     }
 
