@@ -1,6 +1,5 @@
 // Map-Based Geography Quiz Game using Leaflet.js with User-Defined Questions, Scoring, Timer, and Boundary Highlighting
 
-// Ensure script runs only after the DOM is fully loaded
 window.onload = function () {
     // Initialize the map
     const map = L.map('map').setView([20, 0], 2);
@@ -9,8 +8,6 @@ window.onload = function () {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // User-defined questions
-    let savedQuizzes = JSON.parse(localStorage.getItem("savedQuizzes")) || {};
     let userDefinedQuestions = [];
     let score = 0;
     let currentQuestionIndex = 0;
@@ -19,9 +16,6 @@ window.onload = function () {
     let timeLeft = 30;
 
     // UI Elements
-    const quizNameInput = document.getElementById("quiz-name");
-    const saveQuizButton = document.getElementById("save-quiz");
-    const loadQuizList = document.getElementById("saved-quizzes");
     const placeInput = document.getElementById("place-list-input");
     const addPlacesButton = document.getElementById("add-places");
     const startGameButton = document.getElementById("start-game");
@@ -33,10 +27,20 @@ window.onload = function () {
     const clearQuizButton = document.getElementById("clear-quiz");
 
     async function getBoundary(place) {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=geojson&q=${place}&polygon_geojson=1`);
+        const query = encodeURIComponent(place);
+        const response = await fetch(`https://overpass-api.de/api/interpreter?data=[out:json];(relation[name="${query}"];way[name="${query}"];node[name="${query}"];);out geom;`);
         const data = await response.json();
-        if (data.features.length > 0) {
-            return data.features[0];
+
+        if (data.elements.length > 0) {
+            const geoJsonFeature = {
+                type: "Feature",
+                properties: { name: place },
+                geometry: {
+                    type: data.elements[0].type === "relation" ? "MultiPolygon" : "Polygon",
+                    coordinates: data.elements.map(e => e.geometry.map(coord => [coord.lon, coord.lat]))
+                }
+            };
+            return geoJsonFeature;
         }
         return null;
     }
@@ -66,7 +70,7 @@ window.onload = function () {
         });
     }
 
-    map.on('click', function(event) {
+    map.on('click', function (event) {
         checkAnswer(event.latlng);
     });
 
@@ -81,8 +85,6 @@ window.onload = function () {
         let correct = false;
         if (currentQuestion.boundary.type === "Polygon" || currentQuestion.boundary.type === "MultiPolygon") {
             correct = insidePolygon([clickedLatLng.lng, clickedLatLng.lat], currentQuestion.boundary.coordinates);
-        } else if (currentQuestion.boundary.type === "LineString" || currentQuestion.boundary.type === "MultiLineString") {
-            correct = insideLine([clickedLatLng.lng, clickedLatLng.lat], currentQuestion.boundary.coordinates);
         }
 
         if (correct) {
@@ -114,26 +116,6 @@ window.onload = function () {
         return inside;
     }
 
-    function insideLine(point, line) {
-        const tolerance = 0.5;
-        for (let segment of line) {
-            for (let i = 0; i < segment.length - 1; i++) {
-                let p1 = segment[i], p2 = segment[i + 1];
-                let d = distanceToLineSegment(point, p1, p2);
-                if (d < tolerance) return true;
-            }
-        }
-        return false;
-    }
-
-    function distanceToLineSegment(p, v, w) {
-        const l2 = Math.pow(v[0] - w[0], 2) + Math.pow(v[1] - w[1], 2);
-        if (l2 === 0) return Math.hypot(p[0] - v[0], p[1] - v[1]);
-        let t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2;
-        t = Math.max(0, Math.min(1, t));
-        return Math.hypot(p[0] - (v[0] + t * (w[0] - v[0])), p[1] - (v[1] + t * (w[1] - v[1])));
-    }
-
     function showQuestion() {
         if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
             questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
@@ -142,5 +124,39 @@ window.onload = function () {
         }
     }
 
-    updateSavedQuizList();
+    if (startGameButton) {
+        startGameButton.addEventListener("click", function () {
+            if (userDefinedQuestions.length > 0) {
+                currentQuestionIndex = 0;
+                timeLeft = 30;
+                timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                timer = setInterval(() => {
+                    timeLeft--;
+                    timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        alert("Time's up!");
+                    }
+                }, 1000);
+                showQuestion();
+            } else {
+                alert("Please add places before starting the game.");
+            }
+        });
+    }
+
+    if (clearQuizButton) {
+        clearQuizButton.addEventListener("click", function () {
+            userDefinedQuestions = [];
+            placeList.innerHTML = "";
+            questionContainer.innerText = "No questions available.";
+            score = 0;
+            scoreContainer.innerText = `Score: ${score}`;
+            clearInterval(timer);
+            timerContainer.innerText = "Time Left: 30s";
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+        });
+    }
 };
