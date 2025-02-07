@@ -47,20 +47,31 @@ window.onload = function () {
             alert("Please enter a name for the quiz.");
             return;
         }
-        savedQuizzes[quizName] = userDefinedQuestions;
-        localStorage.setItem("savedQuizzes", JSON.stringify(savedQuizzes));
-        updateSavedQuizList();
-        alert("Quiz saved successfully!");
+
+        // Limit stored data size to avoid QuotaExceededError
+        const simplifiedQuizData = userDefinedQuestions.map(q => ({
+            question: q.question,
+            place: q.place
+        }));
+
+        try {
+            savedQuizzes[quizName] = simplifiedQuizData;
+            localStorage.setItem("savedQuizzes", JSON.stringify(savedQuizzes));
+            updateSavedQuizList();
+            alert("Quiz saved successfully!");
+        } catch (error) {
+            alert("Error: Unable to save quiz. Storage limit reached.");
+        }
     }
 
     function resetGame() {
         userDefinedQuestions = [];
         placeList.innerHTML = "";
-        questionContainer.innerText = "No questions available.";
+        if (questionContainer) questionContainer.innerText = "No questions available.";
         score = 0;
-        scoreContainer.innerText = `Score: ${score}`;
+        if (scoreContainer) scoreContainer.innerText = `Score: ${score}`;
         clearInterval(timer);
-        timerContainer.innerText = "Time Left: 30s";
+        if (timerContainer) timerContainer.innerText = "Time Left: 30s";
         if (currentLayer) {
             map.removeLayer(currentLayer);
         }
@@ -88,6 +99,7 @@ window.onload = function () {
                         placeList.appendChild(listItem);
                         userDefinedQuestions.push({
                             question: `Click on ${placeName}`,
+                            place: placeName,
                             boundary: geoData.geometry,
                             listElement: listItem
                         });
@@ -106,10 +118,10 @@ window.onload = function () {
             if (userDefinedQuestions.length > 0) {
                 currentQuestionIndex = 0;
                 timeLeft = 30;
-                timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                if (timerContainer) timerContainer.innerText = `Time Left: ${timeLeft}s`;
                 timer = setInterval(() => {
                     timeLeft--;
-                    timerContainer.innerText = `Time Left: ${timeLeft}s`;
+                    if (timerContainer) timerContainer.innerText = `Time Left: ${timeLeft}s`;
                     if (timeLeft <= 0) {
                         clearInterval(timer);
                         alert("Time's up!");
@@ -152,7 +164,7 @@ window.onload = function () {
         if (correct) {
             feedbackContainer.innerText = "✅ Correct!";
             score += 10;
-            scoreContainer.innerText = `Score: ${score}`;
+            if (scoreContainer) scoreContainer.innerText = `Score: ${score}`;
             currentLayer = L.geoJSON(currentQuestion.boundary, { style: { color: 'green', weight: 3 } }).addTo(map);
             if (currentQuestion.listElement) {
                 currentQuestion.listElement.style.color = "green";
@@ -180,9 +192,9 @@ window.onload = function () {
 
     function showQuestion() {
         if (userDefinedQuestions.length > 0 && currentQuestionIndex < userDefinedQuestions.length) {
-            questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
+            if (questionContainer) questionContainer.innerText = userDefinedQuestions[currentQuestionIndex].question;
         } else {
-            questionContainer.innerText = "Quiz complete!";
+            if (questionContainer) questionContainer.innerText = "Quiz complete!";
         }
     }
 
